@@ -5,29 +5,11 @@
   <title>M & K Chat — Servers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
-    body {
-      background: #111;
-      color: white;
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 20px;
-    }
-    input, button {
-      padding: 10px;
-      margin: 5px;
-      font-size: 16px;
-    }
-    #messages {
-      height: 300px;
-      overflow-y: auto;
-      border: 1px solid #444;
-      padding: 10px;
-      margin-bottom: 10px;
-      text-align: left;
-    }
-    .hidden { display: none; }
-    #timer { font-size: 20px; margin-bottom: 10px; }
+    body { background:#111; color:white; font-family:Arial,sans-serif; text-align:center; margin:0; padding:20px; }
+    input, button { padding:10px; margin:5px; font-size:16px; }
+    #messages { height:300px; overflow-y:auto; border:1px solid #444; padding:10px; margin-bottom:10px; text-align:left; }
+    .hidden { display:none; }
+    #timer { font-size:20px; margin-bottom:10px; }
   </style>
 </head>
 <body>
@@ -89,14 +71,13 @@
   const msgInput = document.getElementById("msg");
   const timerDiv = document.getElementById("timer");
 
-  const PASSWORD = "1234"; // Change as needed
+  const PASSWORD = "1234"; // change if needed
   let user = "";
-  let otherUser = "";
   let serverCollection = "";
-  const RESET_INTERVAL = 35 * 60 * 1000; // 35 minutes in ms
+  const RESET_INTERVAL = 35 * 60 * 1000; // 35 minutes
   let resetTime = Date.now() + RESET_INTERVAL;
 
-  // --- PASSWORD ---
+  // --- LOGIN ---
   window.login = function() {
     if(passInput.value === PASSWORD){
       loginDiv.classList.add("hidden");
@@ -111,16 +92,15 @@
     serverCollection = collectionName;
     serverDiv.classList.add("hidden");
     chooseDiv.classList.remove("hidden");
-    checkReset(); // check if messages need reset
+    checkReset();
   };
 
   // --- USER SELECTION ---
   window.setUser = function(u){
     user = u;
-    otherUser = u === "M" ? "K" : "M";
     chooseDiv.classList.add("hidden");
     chatDiv.classList.remove("hidden");
-    startListening();
+    startListening(); // listen to all messages in this server
     startTimer();
   };
 
@@ -142,9 +122,8 @@
       messagesDiv.innerHTML = "";
       snapshot.forEach(doc => {
         const data = doc.data();
-        if(data.user === user || data.user === otherUser){
-          messagesDiv.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
-        }
+        // now **all messages in this server** are visible to both M and K
+        messagesDiv.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
       });
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
@@ -159,8 +138,8 @@
         resetMessages();
         resetTime = Date.now() + RESET_INTERVAL;
       }
-      const minutes = Math.floor(diff / 60000);
-      const seconds = Math.floor((diff % 60000)/1000);
+      const minutes = Math.floor(diff/60000);
+      const seconds = Math.floor((diff%60000)/1000);
       timerDiv.textContent = `Next reset in ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
     },1000);
   }
@@ -174,7 +153,6 @@
   }
 
   function checkReset(){
-    // Initialize resetTime for new server
     resetTime = Date.now() + RESET_INTERVAL;
   }
 
