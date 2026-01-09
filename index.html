@@ -46,7 +46,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDoc, setDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
   // --- FIREBASE CONFIG ---
   const firebaseConfig = {
@@ -75,7 +75,6 @@
   let user = "";
   let serverCollection = "";
   const RESET_INTERVAL = 35 * 60 * 1000; // 35 minutes
-  let resetTime = Date.now() + RESET_INTERVAL;
 
   // --- LOGIN ---
   window.login = function() {
@@ -88,11 +87,17 @@
   };
 
   // --- SERVER SELECTION ---
-  window.selectServer = function(collectionName){
+  window.selectServer = async function(collectionName){
     serverCollection = collectionName;
     serverDiv.classList.add("hidden");
     chooseDiv.classList.remove("hidden");
-    checkReset();
+
+    // --- initialize/reset timer in server_info doc ---
+    const infoRef = doc(db, collectionName + "_info", "meta");
+    const infoSnap = await getDoc(infoRef);
+    if(!infoSnap.exists()){
+      await setDoc(infoRef, { resetTime: Date.now() + RESET_INTERVAL });
+    }
   };
 
   // --- USER SELECTION ---
@@ -100,7 +105,7 @@
     user = u;
     chooseDiv.classList.add("hidden");
     chatDiv.classList.remove("hidden");
-    startListening(); // listen to all messages in this server
+    startListening();
     startTimer();
   };
 
@@ -122,38 +127,41 @@
       messagesDiv.innerHTML = "";
       snapshot.forEach(doc => {
         const data = doc.data();
-        // now **all messages in this server** are visible to both M and K
         messagesDiv.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
       });
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
   }
 
-  // --- TIMER & RESET ---
-  function startTimer(){
-    setInterval(()=>{
-      const now = Date.now();
-      const diff = resetTime - now;
-      if(diff <= 0){
-        resetMessages();
-        resetTime = Date.now() + RESET_INTERVAL;
-      }
-      const minutes = Math.floor(diff/60000);
-      const seconds = Math.floor((diff%60000)/1000);
-      timerDiv.textContent = `Next reset in ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
-    },1000);
-  }
+  // --- TIMER & RESET SYNCED ---
+  async function startTimer(){
+    const infoRef = doc(db, serverCollection + "_info", "meta");
 
-  async function resetMessages(){
-    const querySnapshot = await getDocs(collection(db, serverCollection));
-    querySnapshot.forEach(async (docSnap)=>{
-      await deleteDoc(doc(db, serverCollection, docSnap.id));
+    onSnapshot(infoRef, async (docSnap)=>{
+      if(!docSnap.exists()) return;
+      let resetTime = docSnap.data().resetTime;
+
+      const interval = setInterval(async ()=>{
+        const now = Date.now();
+        let diff = resetTime - now;
+
+        if(diff <= 0){
+          // RESET messages
+          const msgs = await getDocs(collection(db, serverCollection));
+          msgs.forEach(async (d)=>{
+            await deleteDoc(doc(db, serverCollection, d.id));
+          });
+          // update resetTime for everyone
+          resetTime = Date.now() + RESET_INTERVAL;
+          await setDoc(infoRef, { resetTime: resetTime });
+        }
+
+        diff = resetTime - Date.now();
+        const minutes = Math.floor(diff/60000);
+        const seconds = Math.floor((diff%60000)/1000);
+        timerDiv.textContent = `Next reset in ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+      }, 1000);
     });
-    messagesDiv.innerHTML = "";
-  }
-
-  function checkReset(){
-    resetTime = Date.now() + RESET_INTERVAL;
   }
 
 </script>
