@@ -1,10 +1,43 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hello</title>
+  <title>M & K</title>
+  <style>
+    body { background:#111; color:white; font-family:Arial; text-align:center; }
+    input, button { padding:10px; margin:5px; }
+  </style>
 </head>
 <body>
-  <h1>My first website</h1>
-  <p>If you see this, GitHub Pages works 🎉</p>
+
+<div id="login">
+  <h2>Enter Password</h2>
+  <input id="pass" type="password">
+  <button onclick="login()">Enter</button>
+</div>
+
+<div id="choose" style="display:none;">
+  <h2>Who are you?</h2>
+  <button onclick="setUser('M')">M</button>
+  <button onclick="setUser('K')">K</button>
+</div>
+
+<h3 id="status"></h3>
+
+<script>
+  const PASSWORD = "1234"; // change this
+
+  function login() {
+    if (pass.value === PASSWORD) {
+      login.style.display = "none";
+      choose.style.display = "block";
+    } else alert("Wrong password");
+  }
+
+  function setUser(u) {
+    status.textContent = "You are " + u;
+    choose.style.display = "none";
+  }
+</script>
+
 </body>
 </html>
