@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>M & K Chat</title>
+  <title>M & K Chat — Servers</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <style>
     body {
@@ -27,6 +27,7 @@
       text-align: left;
     }
     .hidden { display: none; }
+    #timer { font-size: 20px; margin-bottom: 10px; }
   </style>
 </head>
 <body>
@@ -39,33 +40,40 @@
     <button onclick="login()">Enter</button>
   </div>
 
-  <!-- USER SELECT SCREEN -->
+  <!-- SERVER SELECTION -->
+  <div id="serverSelect" class="hidden">
+    <h2>Select a Server</h2>
+    <button onclick="selectServer('server1_messages')">Server 1</button>
+    <button onclick="selectServer('server2_messages')">Server 2</button>
+  </div>
+
+  <!-- USER SELECTION -->
   <div id="choose" class="hidden">
     <h2>Who are you?</h2>
     <button onclick="setUser('M')">M</button>
     <button onclick="setUser('K')">K</button>
   </div>
 
-  <!-- CHAT SCREEN -->
+  <!-- CHAT -->
   <div id="chat" class="hidden">
     <h2>M & K Chat</h2>
+    <div id="timer">Next reset in 35:00</div>
     <div id="messages"></div>
     <input id="msg" placeholder="Type a message" onkeydown="if(event.key==='Enter') sendMessage()">
   </div>
 
 <script type="module">
-  // --- FIREBASE CDN IMPORT ---
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  // --- FIREBASE CONFIG --- 
+  // --- FIREBASE CONFIG ---
   const firebaseConfig = {
-    apiKey: "AIzaSyBT7sj4JDmLXuJzyZVe3wQx9nqqdrXgUB0",
+    apiKey: "PASTE_YOUR_API_KEY_HERE",
     authDomain: "mk-chat-f9a10.firebaseapp.com",
     projectId: "mk-chat-f9a10",
-    storageBucket: "mk-chat-f9a10.firebasestorage.app",
-    messagingSenderId: "609608804648",
-    appId: "1:609608804648:web:79e5aae8f3a5851b4cc81d"
+    storageBucket: "PASTE_YOUR_STORAGE_BUCKET_HERE",
+    messagingSenderId: "PASTE_YOUR_SENDER_ID_HERE",
+    appId: "PASTE_YOUR_APP_ID_HERE"
   };
 
   const app = initializeApp(firebaseConfig);
@@ -73,63 +81,103 @@
 
   // --- ELEMENTS ---
   const loginDiv = document.getElementById("login");
+  const serverDiv = document.getElementById("serverSelect");
   const chooseDiv = document.getElementById("choose");
   const chatDiv = document.getElementById("chat");
   const passInput = document.getElementById("pass");
   const messagesDiv = document.getElementById("messages");
   const msgInput = document.getElementById("msg");
+  const timerDiv = document.getElementById("timer");
 
   const PASSWORD = "1234"; // Change as needed
   let user = "";
   let otherUser = "";
+  let serverCollection = "";
+  const RESET_INTERVAL = 35 * 60 * 1000; // 35 minutes in ms
+  let resetTime = Date.now() + RESET_INTERVAL;
 
-  // --- LOGIN ---
+  // --- PASSWORD ---
   window.login = function() {
-    if (passInput.value === PASSWORD) {
+    if(passInput.value === PASSWORD){
       loginDiv.classList.add("hidden");
-      chooseDiv.classList.remove("hidden");
+      serverDiv.classList.remove("hidden");
     } else {
       alert("Wrong password");
     }
   };
 
-  // --- SET M/K ---
-  window.setUser = function(u) {
+  // --- SERVER SELECTION ---
+  window.selectServer = function(collectionName){
+    serverCollection = collectionName;
+    serverDiv.classList.add("hidden");
+    chooseDiv.classList.remove("hidden");
+    checkReset(); // check if messages need reset
+  };
+
+  // --- USER SELECTION ---
+  window.setUser = function(u){
     user = u;
-    otherUser = u === "M" ? "K" : "M";  // The other person
+    otherUser = u === "M" ? "K" : "M";
     chooseDiv.classList.add("hidden");
     chatDiv.classList.remove("hidden");
     startListening();
+    startTimer();
   };
 
   // --- SEND MESSAGE ---
-  window.sendMessage = async function() {
-    if (!msgInput.value.trim()) return;
-
-    await addDoc(collection(db, "messages"), {
+  window.sendMessage = async function(){
+    if(!msgInput.value.trim()) return;
+    await addDoc(collection(db, serverCollection), {
       user: user,
       text: msgInput.value,
       time: Date.now()
     });
-
     msgInput.value = "";
   };
 
-  // --- LISTEN TO M/K MESSAGES ONLY ---
-  function startListening() {
-    const q = query(collection(db, "messages"), orderBy("time"));
+  // --- LISTEN TO SERVER MESSAGES ---
+  function startListening(){
+    const q = query(collection(db, serverCollection), orderBy("time"));
     onSnapshot(q, snapshot => {
       messagesDiv.innerHTML = "";
       snapshot.forEach(doc => {
         const data = doc.data();
-        // Only show messages from M or K
-        if(data.user === user || data.user === otherUser) {
+        if(data.user === user || data.user === otherUser){
           messagesDiv.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
         }
       });
       messagesDiv.scrollTop = messagesDiv.scrollHeight;
     });
   }
+
+  // --- TIMER & RESET ---
+  function startTimer(){
+    setInterval(()=>{
+      const now = Date.now();
+      const diff = resetTime - now;
+      if(diff <= 0){
+        resetMessages();
+        resetTime = Date.now() + RESET_INTERVAL;
+      }
+      const minutes = Math.floor(diff / 60000);
+      const seconds = Math.floor((diff % 60000)/1000);
+      timerDiv.textContent = `Next reset in ${minutes.toString().padStart(2,'0')}:${seconds.toString().padStart(2,'0')}`;
+    },1000);
+  }
+
+  async function resetMessages(){
+    const querySnapshot = await getDocs(collection(db, serverCollection));
+    querySnapshot.forEach(async (docSnap)=>{
+      await deleteDoc(doc(db, serverCollection, docSnap.id));
+    });
+    messagesDiv.innerHTML = "";
+  }
+
+  function checkReset(){
+    // Initialize resetTime for new server
+    resetTime = Date.now() + RESET_INTERVAL;
+  }
+
 </script>
 
 </body>
