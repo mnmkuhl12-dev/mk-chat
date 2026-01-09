@@ -1,42 +1,132 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>M & K</title>
+  <meta charset="UTF-8">
+  <title>M & K Chat</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <style>
-    body { background:#111; color:white; font-family:Arial; text-align:center; }
-    input, button { padding:10px; margin:5px; }
+    body {
+      background: #111;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+
+    input, button {
+      padding: 10px;
+      margin: 5px;
+      font-size: 16px;
+    }
+
+    #messages {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid #444;
+      padding: 10px;
+      margin-bottom: 10px;
+      text-align: left;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
 
-<div id="login">
-  <h2>Enter Password</h2>
-  <input id="pass" type="password">
-  <button onclick="login()">Enter</button>
-</div>
+  <!-- PASSWORD SCREEN -->
+  <div id="login">
+    <h2>Enter Password</h2>
+    <input id="pass" type="password" placeholder="Password">
+    <br>
+    <button onclick="login()">Enter</button>
+  </div>
 
-<div id="choose" style="display:none;">
-  <h2>Who are you?</h2>
-  <button onclick="setUser('M')">M</button>
-  <button onclick="setUser('K')">K</button>
-</div>
+  <!-- USER SELECT -->
+  <div id="choose" class="hidden">
+    <h2>Who are you?</h2>
+    <button onclick="setUser('M')">M</button>
+    <button onclick="setUser('K')">K</button>
+  </div>
 
-<h3 id="status"></h3>
+  <!-- CHAT -->
+  <div id="chat" class="hidden">
+    <h2>M & K Chat</h2>
+    <div id="messages"></div>
+    <input id="msg" placeholder="Type a message"
+           onkeydown="if(event.key==='Enter') sendMessage()">
+  </div>
 
-<script>
-  const PASSWORD = "1234"; // change this
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    addDoc,
+    onSnapshot,
+    query,
+    orderBy
+  } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-  function login() {
+  /* 🔴 PASTE YOUR FIREBASE CONFIG BELOW */
+  const firebaseConfig = {
+    apiKey: "PASTE_HERE",
+    authDomain: "PASTE_HERE",
+    projectId: "mk-chat-f9a10",
+    storageBucket: "PASTE_HERE",
+    messagingSenderId: "PASTE_HERE",
+    appId: "PASTE_HERE"
+  };
+  /* 🔴 STOP PASTING */
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const PASSWORD = "1234"; // change this if you want
+  let user = "";
+
+  window.login = function () {
     if (pass.value === PASSWORD) {
-      login.style.display = "none";
-      choose.style.display = "block";
-    } else alert("Wrong password");
-  }
+      loginDiv.classList.add("hidden");
+      choose.classList.remove("hidden");
+    } else {
+      alert("Wrong password");
+    }
+  };
 
-  function setUser(u) {
-    status.textContent = "You are " + u;
-    choose.style.display = "none";
-  }
+  window.setUser = function (u) {
+    user = u;
+    choose.classList.add("hidden");
+    chat.classList.remove("hidden");
+  };
+
+  window.sendMessage = async function () {
+    if (!msg.value.trim()) return;
+
+    await addDoc(collection(db, "messages"), {
+      user: user,
+      text: msg.value,
+      time: Date.now()
+    });
+
+    msg.value = "";
+  };
+
+  const q = query(collection(db, "messages"), orderBy("time"));
+
+  onSnapshot(q, snapshot => {
+    messages.innerHTML = "";
+    snapshot.forEach(doc => {
+      const data = doc.data();
+      messages.innerHTML += `<div><b>${data.user}:</b> ${data.text}</div>`;
+    });
+    messages.scrollTop = messages.scrollHeight;
+  });
+
 </script>
 
 </body>
